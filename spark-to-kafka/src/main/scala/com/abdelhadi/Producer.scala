@@ -8,15 +8,13 @@ import org.apache.kafka.common.serialization.StringSerializer
 
 import scala.util.{Failure, Success, Try}
 
-class Producer {
+class Producer() {
   val brokers = "rocket-01.srvs.cloudkafka.com:9094,rocket-02.srvs.cloudkafka.com:9094,rocket-03.srvs.cloudkafka.com:9094"
   val username = "9iirknia"
   val password = "RcPU23DrwjfpZOYAfMLkLanPfJuXkcJW"
 
   val jaasTemplate = "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"%s\" password=\"%s\";"
   val jaasCfg: String = String.format(jaasTemplate, username, password)
-
-  val topic: String = username + "-person"
 
   private val props: Properties = new Properties()
   props.put("bootstrap.servers" , brokers)
@@ -31,7 +29,7 @@ class Producer {
 
   private val producer = new KafkaProducer[String, String](props)
   private var n = 0
-  def sendMessage(message: String): Try[Future[RecordMetadata]] = {
+  def sendMessage(message: String, topic: String): Try[Future[RecordMetadata]] = {
     try {
       val record = new ProducerRecord[String, String](topic, message.hashCode.toString, message)
       n = n + 1

@@ -28,10 +28,11 @@ object KafkaToCassandra {
     "sasl.mechanism"-> "SCRAM-SHA-256",
     "sasl.jaas.config"-> jaasCfg
   )
-  val topics = List(username + "-person")
+  val personTopic = List("9iirknia-person")
+  val ipTopic = List("9iirknia-ips")
   val delimiter = ","
 
-  val csbPath = "file:///home/abdelhadi/projects/spark-kafka-to-cassandra/secure-connect.zip"
+  val csbPath = "file:///home/abdelhadi/projects/csv-spark-kafka-cassandra-play/spark-kafka-to-cassandra/secure-connect.zip"
   val cassandraUser = "abdelhadi"
   val cassandraPass = "AsSUPTrFYYSJzX4"
   val keyspace = "person"
@@ -43,7 +44,7 @@ object KafkaToCassandra {
       .set("spark.executor.memory", "480M")
       .set("spark.shuffle.service.enabled", "true")
       .set("spark.dynamicAllocation.enabled", "true")
-      .set("spark.executor.cores", "2")
+      .set("spark.executor.cores", "3")
       .set("spark.dynamicAllocation.maxExecutors","1") // num-executors
       .setJars(Seq("target/scala-2.12/spark-kafka-to-cassandra-assembly-1.0.jar"))
       .setAppName("kafka-to-cassandra")
@@ -52,18 +53,25 @@ object KafkaToCassandra {
       .set("spark.cassandra.auth.password", cassandraPass)
 
     val ssc = new StreamingContext(sparkConf, Seconds(10))
-    val stream = KafkaUtils.createDirectStream[String, String](
-      ssc,
-      PreferConsistent,
-      Subscribe[String, String](topics, kafkaParams)
-    )
-    stream
+
+    KafkaUtils
+      .createDirectStream[String, String](ssc, PreferConsistent, Subscribe[String, String](personTopic, kafkaParams))
       .map(_.value().split(","))
       .filter(_.length == 5)
       .map {
         case Array(_, first_name, last_name, email, gender) => (email, first_name, last_name, gender)
       }
-      .saveToCassandra(keyspace, table, SomeColumns("email", "first_name", "last_name", "gender"))
+      .saveToCassandra(keyspace, "person_by_email", SomeColumns("email", "first_name", "last_name", "gender"))
+
+    KafkaUtils
+      .createDirectStream[String, String](ssc, PreferConsistent, Subscribe[String, String](ipTopic, kafkaParams))
+      .map(_.value().split(","))
+      .filter(_.length == 2)
+      .map {
+        case Array(id, ip) => (ip, id)
+      }
+      .saveToCassandra(keyspace, "id_by_ip", SomeColumns("ip", "id"))
+
     ssc.start()
     ssc.awaitTermination()
 
